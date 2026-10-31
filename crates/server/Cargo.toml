@@ -1,0 +1,11 @@
+[package]
+name = "dart-server"
+description = "Serves the dart web app; home of the future /api."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower-http = { version = "0.6", features = ["fs", "compression-br", "compression-gzip"] }

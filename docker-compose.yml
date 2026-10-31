@@ -1,0 +1,7 @@
+services:
+  dart:
+    build: .
+    image: dart-web-app:latest
+    restart: unless-stopped
+    ports:
+      - "8020:8020"

@@ -1,0 +1,15 @@
+[package]
+name = "dart-core"
+description = "Pure dart game rules: shared by the web client and a future backend."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lib]
+doctest = false
