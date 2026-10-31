@@ -7,7 +7,7 @@ Axum server in a single Docker container.
 ## Games
 
 - **301 / 501**: optional double-in and double-out, bust handling, checkout hints.
-- **Round Robinhood**: close 15–20 and Bull with three marks each
+- **Close Out**: close 15–20 and Bull by hitting each 1, 3, 5 or 7 times
   (single = 1, double = 2, triple = 3); first to close everything wins.
 
 All games support up to 8 players, drag-to-reorder and shuffle, best-of-N legs,

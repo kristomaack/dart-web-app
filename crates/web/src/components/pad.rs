@@ -13,7 +13,7 @@ pub fn Pad(
 ) -> impl IntoView {
     let numbers: Vec<u8> = match kind {
         ModeKind::X01 => (1..=20).collect(),
-        ModeKind::RoundRobinhood => (15..=20).collect(),
+        ModeKind::CloseOut => (15..=20).collect(),
     };
     let fire = move |segment: Segment| {
         if let Some(d) = Dart::new(segment, mult.get_untracked()) {

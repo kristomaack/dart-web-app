@@ -379,10 +379,10 @@ li + li > .row::before {
   content: "501";
 }
 
-.mode-robinhood {
+.mode-close-out {
   background: linear-gradient(160deg, #34c759, #1f8a43);
 }
-.mode-robinhood::before {
+.mode-close-out::before {
   content: "15+";
 }
 
@@ -931,19 +931,15 @@ li + li > .row::before {
 }
 
 .mini {
+  --fill-pct: 0%;
   width: 7px;
   height: 18px;
   border-radius: 2px;
-  background: var(--fill-2);
+  /* Fills from the bottom as hits land; solid green once closed. */
+  background: linear-gradient(to top, color-mix(in srgb, var(--green) 55%, var(--fill-2)) var(--fill-pct), var(--fill-2) var(--fill-pct));
 }
 
-.mini.m1 {
-  background: color-mix(in srgb, var(--green) 35%, var(--fill-2));
-}
-.mini.m2 {
-  background: color-mix(in srgb, var(--green) 65%, var(--fill-2));
-}
-.mini.m3 {
+.mini.closed {
   background: var(--green);
 }
 
@@ -1049,7 +1045,7 @@ li + li > .row::before {
   grid-template-columns: repeat(5, 1fr);
 }
 
-.keys-robinhood {
+.keys-close-out {
   grid-template-columns: repeat(3, 1fr);
 }
 
@@ -1072,7 +1068,7 @@ li + li > .row::before {
   transition: transform 100ms ease-out, background 100ms ease-out;
 }
 
-.keys-robinhood .key {
+.keys-close-out .key {
   height: clamp(56px, 10dvh, 84px);
   font-size: 1.75rem;
 }

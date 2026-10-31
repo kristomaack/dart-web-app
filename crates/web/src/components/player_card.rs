@@ -1,13 +1,13 @@
 use crate::format;
 use dart_core::{
-    Board, DartOutcome, MatchState, ModeConfig, Player, checkout::checkout, modes::robinhood,
+    Board, DartOutcome, MatchState, ModeConfig, Player, checkout::checkout, modes::close_out,
 };
 use leptos::prelude::*;
 
 fn per_round_label(mode: &ModeConfig) -> &'static str {
     match mode {
         ModeConfig::X01(_) => "Avg",
-        ModeConfig::RoundRobinhood => "MPR",
+        ModeConfig::CloseOut(_) => "MPR",
     }
 }
 
@@ -53,20 +53,20 @@ pub fn CurrentCard(
                 }
                 .into_any()
             }
-            (Board::Robinhood(b), _) => view! {
+            (Board::CloseOut(b), _) => view! {
                 <div class="targets">
-                    {robinhood::TARGETS
+                    {close_out::TARGETS
                         .iter()
-                        .zip(b.marks)
-                        .map(|(t, m)| {
+                        .enumerate()
+                        .map(|(i, t)| {
                             let label = match t {
                                 dart_core::Segment::Num(n) => n.to_string(),
                                 _ => "Bull".into(),
                             };
                             view! {
-                                <div class="target" class:closed={m >= robinhood::CLOSED}>
+                                <div class="target" class:closed={b.is_closed(i)}>
                                     <span class="target-label">{label}</span>
-                                    <span class="target-marks">{format::marks_glyph(m)}</span>
+                                    <span class="target-marks">{format::marks(b.marks[i], b.hits)}</span>
                                 </div>
                             }
                         })
@@ -138,11 +138,11 @@ pub fn PlayerRow(
             let p = &s.players[idx];
             let score = match &p.board {
                 Board::X01(b) => view! { <span class="row-score">{b.remaining}</span> }.into_any(),
-                Board::Robinhood(b) => view! {
+                Board::CloseOut(b) => view! {
                     <span class="mini-marks">
                         {b.marks
                             .iter()
-                            .zip(robinhood::TARGETS)
+                            .zip(close_out::TARGETS)
                             .map(|(&m, t)| {
                                 let label = match t {
                                     dart_core::Segment::Num(n) => n.to_string(),
@@ -151,7 +151,11 @@ pub fn PlayerRow(
                                 view! {
                                     <span class="mini-target">
                                         <span class="mini-label">{label}</span>
-                                        <span class=format!("mini m{}", m.min(3))></span>
+                                        <span
+                                            class="mini"
+                                            class:closed={m >= b.hits}
+                                            style:--fill-pct=format!("{}%", m as u32 * 100 / b.hits as u32)
+                                        ></span>
                                     </span>
                                 }
                             })

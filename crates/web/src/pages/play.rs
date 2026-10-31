@@ -49,7 +49,7 @@ pub fn Play() -> impl IntoView {
     let names: Vec<String> = config.players.iter().map(|p| p.name.clone()).collect();
     let progress_unit = match config.mode {
         dart_core::ModeConfig::X01(_) => "",
-        dart_core::ModeConfig::RoundRobinhood => " marks",
+        dart_core::ModeConfig::CloseOut(_) => " marks",
     };
     let nav = navigate.clone();
     let on_dart = Callback::new(move |d: Dart| {

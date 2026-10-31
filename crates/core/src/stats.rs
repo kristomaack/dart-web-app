@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct PlayerStats {
     pub darts: u32,
     pub turns: u32,
-    /// Points scored (X01) or marks hit (Round Robinhood).
+    /// Points scored (X01) or marks hit (Close Out).
     pub progress: u32,
     pub best_turn: u16,
     pub busts: u32,
@@ -14,7 +14,7 @@ pub struct PlayerStats {
 }
 
 impl PlayerStats {
-    /// 3-dart average in X01, marks per round in Round Robinhood.
+    /// 3-dart average in X01, marks per round in Close Out.
     pub fn per_round(&self) -> f32 {
         if self.darts == 0 { 0.0 } else { self.progress as f32 * 3.0 / self.darts as f32 }
     }

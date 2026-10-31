@@ -15,13 +15,15 @@ pub fn route(darts: &[Dart]) -> String {
     darts.iter().map(|d| d.to_string()).collect::<Vec<_>>().join("  ")
 }
 
-/// Cricket-style tally: one slash, a cross, a circled cross when closed.
-pub fn marks_glyph(marks: u8) -> &'static str {
-    match marks {
-        0 => "",
-        1 => "╱",
-        2 => "✕",
-        _ => "⊗",
+/// Tally for a Close Out target: cricket-style slash/cross/circled cross for
+/// three hits, otherwise a count like "2/5"; always ⊗ once closed.
+pub fn marks(marks: u8, hits: u8) -> String {
+    match (marks, hits) {
+        (0, _) => String::new(),
+        (m, h) if m >= h => "⊗".into(),
+        (1, 3) => "╱".into(),
+        (2, 3) => "✕".into(),
+        (m, h) => format!("{m}/{h}"),
     }
 }
 

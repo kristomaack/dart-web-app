@@ -2,29 +2,29 @@
 //! variant, a `Board` variant, and a module implementing its rules. The match
 //! arms below make the compiler point out every place that needs to know.
 
-pub mod robinhood;
+pub mod close_out;
 pub mod x01;
 
 use crate::dart::Dart;
 use serde::{Deserialize, Serialize};
 
-pub use robinhood::RobinhoodBoard;
+pub use close_out::{CloseOutBoard, CloseOutConfig};
 pub use x01::{X01Board, X01Config};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModeKind {
     X01,
-    RoundRobinhood,
+    CloseOut,
 }
 
 impl ModeKind {
-    pub const ALL: [ModeKind; 2] = [ModeKind::X01, ModeKind::RoundRobinhood];
+    pub const ALL: [ModeKind; 2] = [ModeKind::X01, ModeKind::CloseOut];
 
     pub fn slug(self) -> &'static str {
         match self {
             ModeKind::X01 => "x01",
-            ModeKind::RoundRobinhood => "robinhood",
+            ModeKind::CloseOut => "close-out",
         }
     }
 
@@ -35,21 +35,21 @@ impl ModeKind {
     pub fn title(self) -> &'static str {
         match self {
             ModeKind::X01 => "301 / 501",
-            ModeKind::RoundRobinhood => "Round Robinhood",
+            ModeKind::CloseOut => "Close Out",
         }
     }
 
     pub fn tagline(self) -> &'static str {
         match self {
-            ModeKind::X01 => "Count down to zero, first one out wins.",
-            ModeKind::RoundRobinhood => "Hit 15–20 and Bull three times each.",
+            ModeKind::X01 => "First to exactly zero wins.",
+            ModeKind::CloseOut => "Close 15–20 and Bull first.",
         }
     }
 
     pub fn default_config(self) -> ModeConfig {
         match self {
             ModeKind::X01 => ModeConfig::X01(X01Config::default()),
-            ModeKind::RoundRobinhood => ModeConfig::RoundRobinhood,
+            ModeKind::CloseOut => ModeConfig::CloseOut(CloseOutConfig::default()),
         }
     }
 }
@@ -58,14 +58,14 @@ impl ModeKind {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ModeConfig {
     X01(X01Config),
-    RoundRobinhood,
+    CloseOut(CloseOutConfig),
 }
 
 /// A single player's position within the current leg.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Board {
     X01(X01Board),
-    Robinhood(RobinhoodBoard),
+    CloseOut(CloseOutBoard),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,7 +84,7 @@ impl ModeConfig {
     pub fn kind(&self) -> ModeKind {
         match self {
             ModeConfig::X01(_) => ModeKind::X01,
-            ModeConfig::RoundRobinhood => ModeKind::RoundRobinhood,
+            ModeConfig::CloseOut(_) => ModeKind::CloseOut,
         }
     }
 
@@ -92,14 +92,14 @@ impl ModeConfig {
     pub fn label(&self) -> String {
         match self {
             ModeConfig::X01(c) => c.label(),
-            ModeConfig::RoundRobinhood => "Round Robinhood".into(),
+            ModeConfig::CloseOut(c) => format!("Close Out · {} hits", c.hits),
         }
     }
 
     pub fn initial_board(&self) -> Board {
         match self {
             ModeConfig::X01(c) => Board::X01(X01Board::new(c)),
-            ModeConfig::RoundRobinhood => Board::Robinhood(RobinhoodBoard::default()),
+            ModeConfig::CloseOut(c) => Board::CloseOut(CloseOutBoard::new(c)),
         }
     }
 
@@ -108,14 +108,14 @@ impl ModeConfig {
         dart.is_valid()
             && match self {
                 ModeConfig::X01(_) => true,
-                ModeConfig::RoundRobinhood => robinhood::accepts(dart),
+                ModeConfig::CloseOut(_) => close_out::accepts(dart),
             }
     }
 
     pub fn apply(&self, board: &mut Board, dart: Dart) -> DartOutcome {
         match (self, board) {
             (ModeConfig::X01(c), Board::X01(b)) => x01::apply(c, b, dart),
-            (ModeConfig::RoundRobinhood, Board::Robinhood(b)) => robinhood::apply(b, dart),
+            (ModeConfig::CloseOut(_), Board::CloseOut(b)) => close_out::apply(b, dart),
             _ => unreachable!("board does not belong to this mode"),
         }
     }
@@ -123,11 +123,11 @@ impl ModeConfig {
 
 impl Board {
     /// Monotonic "how far along" measure used for stats and ranking:
-    /// points scored in X01, marks in Round Robinhood.
+    /// points scored in X01, marks in Close Out.
     pub fn progress(&self) -> u16 {
         match self {
             Board::X01(b) => b.start - b.remaining,
-            Board::Robinhood(b) => b.total_marks(),
+            Board::CloseOut(b) => b.total_marks(),
         }
     }
 }

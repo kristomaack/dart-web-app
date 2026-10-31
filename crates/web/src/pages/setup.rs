@@ -3,7 +3,10 @@ use crate::components::controls::{Segmented, Toggle};
 use crate::components::reorder_list::ReorderList;
 use crate::platform;
 use dart_core::{FinishMode, MAX_PLAYERS, Match, MatchConfig, ModeConfig, ModeKind, Player};
+use dart_core::modes::close_out;
 use leptos::prelude::*;
+
+const HIT_LABELS: [&str; 8] = ["0", "1", "2", "3", "4", "5", "6", "7"];
 use leptos_router::hooks::{use_navigate, use_params_map};
 
 #[component]
@@ -61,6 +64,10 @@ pub fn Setup() -> impl IntoView {
             .collect_view()
     };
 
+    let hits = move || match mode.get() {
+        ModeConfig::CloseOut(c) => Some(c.hits),
+        _ => None,
+    };
     let x01 = move || match mode.get() {
         ModeConfig::X01(c) => Some(c),
         _ => None,
@@ -169,6 +176,29 @@ pub fn Setup() -> impl IntoView {
                                     />
                                 </div>
                             </section>
+            </Show>
+
+            <Show when=move || hits().is_some()>
+                <section class="group">
+                    <h2 class="group-title">"Rules"</h2>
+                    <div class="list">
+                        <div class="row">
+                            <span class="row-title grow">"Hits to close"</span>
+                            <Segmented
+                                options=close_out::HIT_OPTIONS.iter().map(|&h| (h, HIT_LABELS[h as usize])).collect()
+                                value=Signal::derive(move || hits().unwrap_or(3))
+                                on_change=Callback::new(move |h: u8| {
+                                    mode.update(|m| {
+                                        if let ModeConfig::CloseOut(c) = m {
+                                            c.hits = h
+                                        }
+                                    })
+                                })
+                            />
+                        </div>
+                    </div>
+                    <p class="footnote">"Single = 1 hit, double = 2, triple = 3. Bullseye counts as 2."</p>
+                </section>
             </Show>
 
             <section class="group">

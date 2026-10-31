@@ -273,7 +273,7 @@ impl MatchState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modes::{RobinhoodBoard, X01Board, X01Config};
+    use crate::modes::{CloseOutBoard, CloseOutConfig, X01Board, X01Config};
 
     fn players(n: usize) -> Vec<Player> {
         (0..n).map(|i| Player { id: i.to_string(), name: format!("P{i}") }).collect()
@@ -301,7 +301,7 @@ mod tests {
 
     fn marks(s: &MatchState, p: usize) -> [u8; 7] {
         match &s.players[p].board {
-            Board::Robinhood(RobinhoodBoard { marks }) => *marks,
+            Board::CloseOut(CloseOutBoard { marks, .. }) => *marks,
             _ => unreachable!(),
         }
     }
@@ -386,12 +386,12 @@ mod tests {
     }
 
     #[test]
-    fn robinhood_marks_cap_and_mid_turn_win() {
+    fn close_out_marks_cap_and_mid_turn_win() {
         let mut m = Match::new(
             "r".into(),
             0.0,
             MatchConfig {
-                mode: ModeConfig::RoundRobinhood,
+                mode: ModeConfig::CloseOut(CloseOutConfig::default()),
                 players: players(2),
                 best_of: 1,
                 finish: FinishMode::FirstOut,
@@ -449,6 +449,26 @@ mod tests {
         assert!(s.finished);
         assert_eq!(s.ranking(), vec![0, 1]);
         assert_eq!(s.players[0].stats.best_checkout, Some(40));
+    }
+
+    #[test]
+    fn close_out_hits_setting() {
+        let cfg = |hits| MatchConfig {
+            mode: ModeConfig::CloseOut(CloseOutConfig { hits }),
+            players: players(1),
+            best_of: 1,
+            finish: FinishMode::FirstOut,
+        };
+        // One hit each: seven singles win.
+        let mut m = Match::new("c".into(), 0.0, cfg(1));
+        let darts: Vec<Dart> = (15..=20).map(Dart::single).chain([Dart::outer_bull()]).collect();
+        assert!(throw_all(&mut m, &darts).finished);
+
+        // Seven hits: a treble only gets you part of the way, and marks cap at 7.
+        let mut m = Match::new("c".into(), 0.0, cfg(7));
+        let s = throw_all(&mut m, &[Dart::triple(20), Dart::triple(20), Dart::triple(20)]);
+        assert_eq!(marks(&s, 0)[5], 7);
+        assert_eq!(s.players[0].stats.progress, 7);
     }
 
     #[test]
