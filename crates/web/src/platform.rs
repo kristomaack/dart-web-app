@@ -28,6 +28,80 @@ fn method(target: &JsValue, name: &str) -> Option<Function> {
     Reflect::get(target, &name.into()).ok()?.dyn_into().ok()
 }
 
+/// Whether the user asked for less motion. Script-driven animations must
+/// check this themselves; the CSS media query doesn't reach them.
+pub fn reduced_motion() -> bool {
+    web_sys::window()
+        .and_then(|w| method(&w, "matchMedia")?.call1(&w, &"(prefers-reduced-motion: reduce)".into()).ok())
+        .and_then(|mq| Reflect::get(&mq, &"matches".into()).ok())
+        .is_some_and(|m| m.is_truthy())
+}
+
+/// Runs a Web Animations API animation on `el` (`keyframes` is a JSON array),
+/// calling `on_finish` when it ends. Without the API, `on_finish` runs at once.
+pub fn animate(el: &web_sys::Element, keyframes: &str, ms: f64, easing: &str, on_finish: Option<Box<dyn FnOnce()>>) {
+    animate_part(el, None, false, keyframes, ms, easing, on_finish)
+}
+
+/// Like [`animate`], optionally on a pseudo-element of `el` such as
+/// `::backdrop`. With `hold`, the end state stays applied after it finishes
+/// (until the element is closed or removed); leave it off for anything whose
+/// inline style changes later, or the held frame will override it.
+pub fn animate_part(
+    el: &web_sys::Element,
+    pseudo: Option<&str>,
+    hold: bool,
+    keyframes: &str,
+    ms: f64,
+    easing: &str,
+    on_finish: Option<Box<dyn FnOnce()>>,
+) {
+    let anim = (|| {
+        let frames = js_sys::JSON::parse(keyframes).ok()?;
+        let opts = js_sys::Object::new();
+        Reflect::set(&opts, &"duration".into(), &ms.into()).ok()?;
+        Reflect::set(&opts, &"easing".into(), &easing.into()).ok()?;
+        if hold {
+            Reflect::set(&opts, &"fill".into(), &"forwards".into()).ok()?;
+        }
+        if let Some(p) = pseudo {
+            Reflect::set(&opts, &"pseudoElement".into(), &p.into()).ok()?;
+        }
+        method(el, "animate")?.call2(el, &frames, &opts).ok()
+    })();
+    match (anim, on_finish) {
+        (Some(anim), Some(f)) => {
+            let _ = Reflect::set(&anim, &"onfinish".into(), &Closure::once_into_js(f));
+        }
+        (None, Some(f)) => f(),
+        _ => {}
+    }
+}
+
+/// Cancels every running or held animation on `el`, pseudo-elements included.
+pub fn cancel_animations(el: &web_sys::Element) {
+    let opts = js_sys::Object::new();
+    let _ = Reflect::set(&opts, &"subtree".into(), &true.into());
+    let Some(list) = method(el, "getAnimations").and_then(|f| f.call1(el, &opts).ok()) else { return };
+    for anim in js_sys::Array::from(&list).iter() {
+        if let Some(cancel) = method(&anim, "cancel") {
+            let _ = cancel.call0(&anim);
+        }
+    }
+}
+
+/// A custom property's computed value on `el`, e.g. `--lift`.
+pub fn css_var(el: &web_sys::Element, name: &str) -> Option<String> {
+    let w = web_sys::window()?;
+    let style = method(&w, "getComputedStyle")?.call1(&w, el).ok()?;
+    let v = method(&style, "getPropertyValue")?.call1(&style, &name.into()).ok()?.as_string()?;
+    let v = v.trim();
+    (!v.is_empty()).then(|| v.to_string())
+}
+
+/// The `--ease` curve from app.css, for script-driven animations.
+pub const EASE: &str = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+
 pub mod haptic {
     pub const TAP: &[u32] = &[8];
     pub const TICK: &[u32] = &[4];

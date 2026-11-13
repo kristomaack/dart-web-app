@@ -1,13 +1,13 @@
 use crate::format;
 use dart_core::{
-    Board, DartOutcome, MatchState, ModeConfig, Player, checkout::checkout, modes::close_out,
+    Board, DartOutcome, MatchState, ModeConfig, Player, checkout::checkout, modes::cricket,
 };
 use leptos::prelude::*;
 
 fn per_round_label(mode: &ModeConfig) -> &'static str {
     match mode {
         ModeConfig::X01(_) => "Avg",
-        ModeConfig::CloseOut(_) => "MPR",
+        ModeConfig::Cricket(_) => "MPR",
     }
 }
 
@@ -53,9 +53,9 @@ pub fn CurrentCard(
                 }
                 .into_any()
             }
-            (Board::CloseOut(b), _) => view! {
+            (Board::Cricket(b), _) => view! {
                 <div class="targets">
-                    {close_out::TARGETS
+                    {cricket::TARGETS
                         .iter()
                         .enumerate()
                         .map(|(i, t)| {
@@ -63,8 +63,25 @@ pub fn CurrentCard(
                                 dart_core::Segment::Num(n) => n.to_string(),
                                 _ => "Bull".into(),
                             };
+                            let closed = b.is_closed(i);
+                            let scores = closed && cricket::can_score(b, i, s.opponents(s.current));
+                            // With points on, a closed number either still scores or is dead.
+                            let dead = b.points_on && closed && !scores;
+                            let state = match (closed, scores, dead) {
+                                (_, true, _) => "closed, scores",
+                                (_, _, true) => "dead",
+                                (true, ..) => "closed",
+                                _ => "open",
+                            };
+                            let aria = format!("{label}: {state}");
                             view! {
-                                <div class="target" class:closed={b.is_closed(i)}>
+                                <div
+                                    class="target"
+                                    class:closed=closed
+                                    class:scores=scores
+                                    class:dead=dead
+                                    aria-label=aria
+                                >
                                     <span class="target-label">{label}</span>
                                     <span class="target-marks">{format::marks(b.marks[i], b.hits)}</span>
                                 </div>
@@ -76,6 +93,33 @@ pub fn CurrentCard(
             .into_any(),
             _ => ().into_any(),
         })
+    };
+
+    // Keyed on the value so the number pops only when it changes, and not
+    // when the card first appears for a new turn.
+    let points = Memo::new(move |_| {
+        state.with(|s| {
+            s.as_ref().and_then(|s| match &s.players[s.current].board {
+                Board::Cricket(b) if b.points_on => Some(b.points),
+                _ => None,
+            })
+        })
+    });
+    let first_points = StoredValue::new(true);
+    let points_view = view! {
+        <For
+            each=move || points.get()
+            key=|p| *p
+            children=move |p| {
+                let bump = !first_points.get_value();
+                first_points.set_value(false);
+                view! {
+                    <div class="cricket-points" class:bump=bump aria-live="polite">
+                        {p}<span class="cricket-points-unit">" pts"</span>
+                    </div>
+                }
+            }
+        />
     };
 
     let slots = move || {
@@ -118,6 +162,7 @@ pub fn CurrentCard(
                 <span class="current-name">{name}</span>
                 <span class="current-meta">{meta}</span>
             </div>
+            {points_view}
             {main}
             {slots}
         </section>
@@ -138,11 +183,11 @@ pub fn PlayerRow(
             let p = &s.players[idx];
             let score = match &p.board {
                 Board::X01(b) => view! { <span class="row-score">{b.remaining}</span> }.into_any(),
-                Board::CloseOut(b) => view! {
+                Board::Cricket(b) => view! {
                     <span class="mini-marks">
                         {b.marks
                             .iter()
-                            .zip(close_out::TARGETS)
+                            .zip(cricket::TARGETS)
                             .map(|(&m, t)| {
                                 let label = match t {
                                     dart_core::Segment::Num(n) => n.to_string(),
@@ -161,6 +206,7 @@ pub fn PlayerRow(
                             })
                             .collect_view()}
                     </span>
+                    {b.points_on.then(|| view! { <span class="row-score row-pts">{b.points}</span> })}
                 }
                 .into_any(),
             };

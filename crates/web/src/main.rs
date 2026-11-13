@@ -4,6 +4,7 @@ mod format;
 mod pages;
 mod platform;
 mod repo;
+mod rules;
 
 fn main() {
     console_error_panic_hook::set_once();

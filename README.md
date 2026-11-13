@@ -7,8 +7,11 @@ Axum server in a single Docker container.
 ## Games
 
 - **301 / 501**: optional double-in and double-out, bust handling, checkout hints.
-- **Close Out**: close 15–20 and Bull by hitting each 1, 3, 5 or 7 times
-  (single = 1, double = 2, triple = 3); first to close everything wins.
+- **Cricket**: close 15–20 and Bull by hitting each 1, 3, 5 or 7 times
+  (single = 1, double = 2, triple = 3). With points on (the default), extra hits
+  on a number you've closed score its value (Bull 25) while any opponent still
+  has it open, and you win by closing everything with at least as many points
+  as everyone else. With points off, the first to close everything wins.
 
 All games support up to 8 players, drag-to-reorder and shuffle, best-of-N legs,
 "first out wins" or "play on for places", undo across turns, per-player stats

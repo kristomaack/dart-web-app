@@ -3,7 +3,7 @@ use crate::components::controls::{Segmented, Toggle};
 use crate::components::reorder_list::ReorderList;
 use crate::platform;
 use dart_core::{FinishMode, MAX_PLAYERS, Match, MatchConfig, ModeConfig, ModeKind, Player};
-use dart_core::modes::close_out;
+use dart_core::modes::cricket;
 use leptos::prelude::*;
 
 const HIT_LABELS: [&str; 8] = ["0", "1", "2", "3", "4", "5", "6", "7"];
@@ -64,9 +64,17 @@ pub fn Setup() -> impl IntoView {
             .collect_view()
     };
 
-    let hits = move || match mode.get() {
-        ModeConfig::CloseOut(c) => Some(c.hits),
+    let cricket_cfg = move || match mode.get() {
+        ModeConfig::Cricket(c) => Some(c),
         _ => None,
+    };
+    let hits = move || cricket_cfg().map(|c| c.hits);
+    let set_cricket = move |f: &dyn Fn(&mut dart_core::modes::CricketConfig)| {
+        mode.update(|m| {
+            if let ModeConfig::Cricket(c) = m {
+                f(c)
+            }
+        })
     };
     let x01 = move || match mode.get() {
         ModeConfig::X01(c) => Some(c),
@@ -185,19 +193,28 @@ pub fn Setup() -> impl IntoView {
                         <div class="row">
                             <span class="row-title grow">"Hits to close"</span>
                             <Segmented
-                                options=close_out::HIT_OPTIONS.iter().map(|&h| (h, HIT_LABELS[h as usize])).collect()
+                                options=cricket::HIT_OPTIONS.iter().map(|&h| (h, HIT_LABELS[h as usize])).collect()
                                 value=Signal::derive(move || hits().unwrap_or(3))
-                                on_change=Callback::new(move |h: u8| {
-                                    mode.update(|m| {
-                                        if let ModeConfig::CloseOut(c) = m {
-                                            c.hits = h
-                                        }
-                                    })
-                                })
+                                on_change=Callback::new(move |h: u8| set_cricket(&|c| c.hits = h))
                             />
                         </div>
+                        <Toggle
+                            label="Score points"
+                            detail="Hits on your closed numbers score while an opponent still has them open"
+                            value=Signal::derive(move || cricket_cfg().is_some_and(|c| c.points))
+                            on_change=Callback::new(move |v: bool| set_cricket(&|c| c.points = v))
+                        />
                     </div>
-                    <p class="footnote">"Single = 1 hit, double = 2, triple = 3. Bullseye counts as 2."</p>
+                    <p class="footnote">
+                        "Single = 1 hit, double = 2, triple = 3. Bullseye counts as 2. "
+                        {move || {
+                            if cricket_cfg().is_some_and(|c| c.points) {
+                                "Close everything with at least as many points as everyone else to win."
+                            } else {
+                                "First to close everything wins."
+                            }
+                        }}
+                    </p>
                 </section>
             </Show>
 

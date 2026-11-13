@@ -15,7 +15,7 @@ pub fn route(darts: &[Dart]) -> String {
     darts.iter().map(|d| d.to_string()).collect::<Vec<_>>().join("  ")
 }
 
-/// Tally for a Close Out target: cricket-style slash/cross/circled cross for
+/// Tally for a Cricket target: the classic slash/cross/circled cross for
 /// three hits, otherwise a count like "2/5"; always ⊗ once closed.
 pub fn marks(marks: u8, hits: u8) -> String {
     match (marks, hits) {

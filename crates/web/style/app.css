@@ -328,6 +328,138 @@ li + li > .row::before {
   font-weight: 300;
 }
 
+/* ---------- Game rows with rules ---------- */
+
+.mode-item {
+  position: relative;
+}
+
+/* Keep the title clear of the (i), which sits over the row. */
+.mode-item .row-text {
+  margin-right: 36px;
+}
+
+/* 44px touch target around a 22px circled "i", just left of the chevron. */
+.info-btn {
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  color: var(--accent);
+  transition: transform 100ms ease-out, opacity 100ms ease-out;
+}
+
+.info-btn span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font: italic 600 0.8125rem/1 Georgia, "Times New Roman", serif;
+}
+
+.info-btn:active {
+  transform: scale(0.88);
+  opacity: 0.6;
+  transition-duration: 0ms;
+}
+
+/* The rules card. Motion is scripted (grows from the (i)); this is the resting state. */
+.rules {
+  width: min(420px, calc(100% - 2 * var(--gutter)));
+  max-height: calc(100dvh - 2 * var(--gutter) - var(--top) - var(--bottom));
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--label);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.rules::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+body:has(.rules[open]) {
+  overflow: hidden;
+}
+
+.rules-body {
+  padding: 18px 20px 20px;
+}
+
+.rules-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.rules-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.rules-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px -10px -8px 0;
+}
+
+.rules-close span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--label-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: transform 100ms ease-out;
+}
+
+.rules-close:active span {
+  transform: scale(0.88);
+  background: var(--fill-2);
+  transition-duration: 0ms;
+}
+
+.rules h3 {
+  margin: 18px 0 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--label-2);
+}
+
+.rules p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.rules .btn-primary {
+  margin-top: 22px;
+}
+
 .eyebrow {
   font-size: 0.75rem;
   font-weight: 600;
@@ -379,10 +511,10 @@ li + li > .row::before {
   content: "501";
 }
 
-.mode-close-out {
+.mode-cricket {
   background: linear-gradient(160deg, #34c759, #1f8a43);
 }
-.mode-close-out::before {
+.mode-cricket::before {
   content: "15+";
 }
 
@@ -659,6 +791,7 @@ li + li > .row::before {
 
 .reorder-row.lifted {
   z-index: 2;
+  transition: box-shadow 150ms var(--ease);
   box-shadow: var(--lift);
   border-radius: 10px;
 }
@@ -723,6 +856,7 @@ li + li > .row::before {
 }
 
 .play-body {
+  position: relative; /* anchors the outgoing card's ghost */
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -738,11 +872,33 @@ li + li > .row::before {
   animation: card-in 320ms var(--ease) both;
 }
 
+/* The next player rises out of the queue below; undo brings the previous one
+   back down from above. */
 @keyframes card-in {
   from {
     opacity: 0;
-    transform: translateX(28px);
+    transform: translateY(24px);
   }
+}
+
+.card-wrap.back .current {
+  animation-name: card-in-back;
+}
+
+@keyframes card-in-back {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+
+/* Snapshot of the outgoing card, faded out by script over the incoming one. */
+.current.ghost {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  animation: none;
+  pointer-events: none;
 }
 
 .current-head {
@@ -834,6 +990,22 @@ li + li > .row::before {
   font-variant-numeric: tabular-nums;
 }
 
+.cricket-points {
+  margin-top: 4px;
+  font-size: clamp(2.25rem, 12vw, 3.25rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cricket-points-unit {
+  font-size: 0.4em;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--label-2);
+}
+
 .targets {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -873,6 +1045,21 @@ li + li > .row::before {
   color: rgba(255, 255, 255, 0.85);
 }
 
+/* Closed by everyone: no marks or points left in it. */
+.target.closed.dead {
+  background: var(--fill);
+  color: var(--label-3);
+}
+
+.target.closed.dead .target-label {
+  color: var(--label-3);
+  text-decoration: line-through;
+}
+
+.cricket-points.bump {
+  animation: pop 180ms var(--ease);
+}
+
 .others {
   margin-top: 12px;
 }
@@ -898,6 +1085,13 @@ li + li > .row::before {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.row-pts {
+  min-width: 2.5ch;
+  margin-left: 10px;
+  text-align: right;
+  font-size: 1.125rem;
 }
 
 .badge {
@@ -967,12 +1161,13 @@ li + li > .row::before {
   right: 0;
   top: calc(var(--top) + 52px);
   z-index: 20;
-  display: flex;
-  justify-content: center;
+  display: grid;
+  justify-items: center;
   pointer-events: none;
 }
 
 .toast {
+  grid-area: 1 / 1; /* an outgoing toast overlaps the incoming one */
   padding: 8px 16px;
   border-radius: 999px;
   background: var(--material);
@@ -982,6 +1177,17 @@ li + li > .row::before {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   animation: toast-in 260ms var(--ease) both;
+}
+
+.toast.leaving {
+  animation: toast-out 180ms ease-in both;
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
 }
 
 .toast.warn {
@@ -1045,7 +1251,7 @@ li + li > .row::before {
   grid-template-columns: repeat(5, 1fr);
 }
 
-.keys-close-out {
+.keys-cricket {
   grid-template-columns: repeat(3, 1fr);
 }
 
@@ -1068,7 +1274,7 @@ li + li > .row::before {
   transition: transform 100ms ease-out, background 100ms ease-out;
 }
 
-.keys-close-out .key {
+.keys-cricket .key {
   height: clamp(56px, 10dvh, 84px);
   font-size: 1.75rem;
 }
@@ -1081,6 +1287,11 @@ li + li > .row::before {
 
 .key:disabled {
   opacity: 0.3;
+}
+
+/* Still tappable (a dart can land there) but it won't count. */
+.key.dead {
+  opacity: 0.45;
 }
 
 .key small {
@@ -1190,6 +1401,12 @@ li + li > .row::before {
   .toast {
     animation: fade 200ms ease both !important;
   }
+  .toast.leaving {
+    animation: fade 150ms ease reverse both !important;
+  }
+  .current.ghost {
+    animation: none !important;
+  }
   @keyframes fade {
     from {
       opacity: 0;
@@ -1211,6 +1428,9 @@ li + li > .row::before {
 @media (prefers-contrast: more) {
   :root {
     --sep: var(--label-2);
+  }
+  .rules {
+    box-shadow: 0 0 0 1px var(--label-2);
   }
   .key,
   .slot.filled,

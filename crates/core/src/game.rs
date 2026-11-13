@@ -145,6 +145,15 @@ impl MatchState {
         s
     }
 
+    /// Boards of the players still in the leg other than `p`.
+    pub fn opponents(&self, p: usize) -> impl Iterator<Item = &Board> + Clone {
+        self.players
+            .iter()
+            .enumerate()
+            .filter(move |&(i, o)| i != p && o.place.is_none())
+            .map(|(_, o)| &o.board)
+    }
+
     pub fn darts_left(&self) -> usize {
         DARTS_PER_TURN - self.turn.len()
     }
@@ -154,7 +163,8 @@ impl MatchState {
         self.players[self.current].board.progress() - self.turn_start.progress()
     }
 
-    /// Everyone ordered best-first: final places, then legs, then progress.
+    /// Everyone ordered best-first: final places, then legs, then points
+    /// (Cricket), then progress.
     pub fn ranking(&self) -> Vec<usize> {
         let mut order: Vec<usize> = (0..self.players.len()).collect();
         order.sort_by_key(|&i| {
@@ -162,6 +172,7 @@ impl MatchState {
             (
                 p.place.unwrap_or(u8::MAX),
                 std::cmp::Reverse(p.legs_won),
+                std::cmp::Reverse(p.board.points()),
                 std::cmp::Reverse(p.board.progress()),
             )
         });
@@ -171,7 +182,10 @@ impl MatchState {
     fn step(&mut self, cfg: &MatchConfig, dart: Dart) {
         self.last_event = None;
         let p = self.current;
-        let outcome = cfg.mode.apply(&mut self.players[p].board, dart);
+        let (before, rest) = self.players.split_at_mut(p);
+        let (me, after) = rest.split_first_mut().expect("current player exists");
+        let others = before.iter().chain(after.iter()).filter(|o| o.place.is_none()).map(|o| &o.board);
+        let outcome = cfg.mode.apply(&mut me.board, dart, others);
         self.turn.push((dart, outcome));
         self.players[p].stats.darts += 1;
 
@@ -236,6 +250,9 @@ impl MatchState {
             self.last_event = Some(Event::LegWon { player: p });
         }
 
+        if !multi_leg && cfg.finish == FinishMode::PlayForPlaces {
+            self.place_new_leaders(cfg);
+        }
         let active = self.players.iter().filter(|p| p.place.is_none()).count();
         if active <= 1 || (cfg.finish == FinishMode::FirstOut && won_match) {
             self.finish_match();
@@ -243,6 +260,16 @@ impl MatchState {
             self.new_leg(cfg);
         } else {
             self.advance();
+        }
+    }
+
+    /// Someone dropping out can hand the win to a player who already closed
+    /// out behind on points (Cricket); place them now, best first.
+    fn place_new_leaders(&mut self, cfg: &MatchConfig) {
+        while let Some(i) = self.ranking().into_iter().find(|&i| {
+            self.players[i].place.is_none() && cfg.mode.is_won(&self.players[i].board, self.opponents(i))
+        }) {
+            self.players[i].place = Some(self.placed_count() + 1);
         }
     }
 
@@ -273,7 +300,7 @@ impl MatchState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modes::{CloseOutBoard, CloseOutConfig, X01Board, X01Config};
+    use crate::modes::{CricketBoard, CricketConfig, X01Board, X01Config};
 
     fn players(n: usize) -> Vec<Player> {
         (0..n).map(|i| Player { id: i.to_string(), name: format!("P{i}") }).collect()
@@ -301,7 +328,7 @@ mod tests {
 
     fn marks(s: &MatchState, p: usize) -> [u8; 7] {
         match &s.players[p].board {
-            Board::CloseOut(CloseOutBoard { marks, .. }) => *marks,
+            Board::Cricket(CricketBoard { marks, .. }) => *marks,
             _ => unreachable!(),
         }
     }
@@ -386,12 +413,12 @@ mod tests {
     }
 
     #[test]
-    fn close_out_marks_cap_and_mid_turn_win() {
+    fn cricket_marks_cap_and_mid_turn_win() {
         let mut m = Match::new(
             "r".into(),
             0.0,
             MatchConfig {
-                mode: ModeConfig::CloseOut(CloseOutConfig::default()),
+                mode: ModeConfig::Cricket(CricketConfig { hits: 3, points: false }),
                 players: players(2),
                 best_of: 1,
                 finish: FinishMode::FirstOut,
@@ -452,9 +479,9 @@ mod tests {
     }
 
     #[test]
-    fn close_out_hits_setting() {
+    fn cricket_hits_setting() {
         let cfg = |hits| MatchConfig {
-            mode: ModeConfig::CloseOut(CloseOutConfig { hits }),
+            mode: ModeConfig::Cricket(CricketConfig { hits, points: false }),
             players: players(1),
             best_of: 1,
             finish: FinishMode::FirstOut,
@@ -469,6 +496,115 @@ mod tests {
         let s = throw_all(&mut m, &[Dart::triple(20), Dart::triple(20), Dart::triple(20)]);
         assert_eq!(marks(&s, 0)[5], 7);
         assert_eq!(s.players[0].stats.progress, 7);
+    }
+
+    fn cricket(n: usize) -> Match {
+        Match::new(
+            "k".into(),
+            0.0,
+            MatchConfig {
+                mode: ModeConfig::Cricket(CricketConfig::default()),
+                players: players(n),
+                best_of: 1,
+                finish: FinishMode::FirstOut,
+            },
+        )
+    }
+
+    fn points(s: &MatchState, p: usize) -> u32 {
+        s.players[p].board.points()
+    }
+
+    #[test]
+    fn cricket_points_only_while_an_opponent_is_open() {
+        let mut m = cricket(2);
+        // Two marks on 20, then a treble closes it and scores the extra 2 marks.
+        let s = throw_all(&mut m, &[Dart::double(20), Dart::triple(20), Dart::MISS]);
+        assert_eq!(marks(&s, 0)[5], 3);
+        assert_eq!(points(&s, 0), 40);
+        assert_eq!(s.players[0].stats.progress, 5, "MPR still counts marks");
+
+        // Bull scores 25 per mark.
+        throw_all(&mut m, &[Dart::MISS; 3]); // P1
+        let s = throw_all(&mut m, &[Dart::bullseye(), Dart::bullseye(), Dart::MISS]);
+        assert_eq!(points(&s, 0), 40 + 25);
+
+        // Once P1 closes 20 it is dead: no points, no marks.
+        let s = throw_all(&mut m, &[Dart::triple(20), Dart::MISS, Dart::MISS]); // P1
+        assert_eq!(points(&s, 1), 0, "closing scores nothing");
+        let s = throw_all(&mut m, &[Dart::triple(20)]);
+        assert_eq!(s.turn[0].1, DartOutcome::NoScore);
+        assert_eq!(points(&s, 0), 65);
+        assert_eq!(s.ranking(), vec![0, 1], "points rank unfinished players");
+    }
+
+    #[test]
+    fn cricket_closing_out_behind_does_not_win() {
+        let mut m = cricket(2);
+        // P0 closes 15–20.
+        throw_all(&mut m, &[Dart::triple(15), Dart::triple(16), Dart::triple(17)]);
+        // P1 closes 20 and scores 120 on it.
+        throw_all(&mut m, &[Dart::triple(20), Dart::triple(20), Dart::triple(20)]);
+        throw_all(&mut m, &[Dart::triple(18), Dart::triple(19), Dart::triple(20)]);
+        throw_all(&mut m, &[Dart::MISS; 3]); // P1
+        // P0 closes the bull but trails 0–120: the game goes on.
+        let s = throw_all(&mut m, &[Dart::bullseye(), Dart::outer_bull()]);
+        assert!(!s.finished);
+        assert_eq!(s.last_event, None);
+        // Scoring on the open bull catches up: 4 bullseyes = 200.
+        let s = throw_all(&mut m, &[Dart::bullseye()]); // 3rd dart, 50
+        assert_eq!(points(&s, 0), 50);
+        throw_all(&mut m, &[Dart::MISS; 3]); // P1
+        let s = throw_all(&mut m, &[Dart::bullseye(), Dart::bullseye()]);
+        assert_eq!(points(&s, 0), 150);
+        assert!(s.finished, "complete and ahead wins mid-turn");
+        assert_eq!(s.players[0].place, Some(1));
+    }
+
+    #[test]
+    fn cricket_leader_wins_by_closing_out() {
+        let mut m = cricket(2);
+        throw_all(&mut m, &[Dart::MISS; 3]); // P0
+        throw_all(&mut m, &[Dart::triple(15), Dart::triple(16), Dart::triple(17)]);
+        throw_all(&mut m, &[Dart::MISS; 3]); // P0
+        throw_all(&mut m, &[Dart::triple(18), Dart::triple(19), Dart::triple(20)]);
+        throw_all(&mut m, &[Dart::MISS; 3]); // P0
+        let s = throw_all(&mut m, &[Dart::bullseye(), Dart::outer_bull()]);
+        assert!(s.finished, "0–0 counts as level");
+        assert_eq!(s.players[1].place, Some(1));
+    }
+
+    #[test]
+    fn cricket_places_a_leader_left_behind_when_someone_drops_out() {
+        // One hit closes; P2 builds a lead, P0 and P1 both close out behind it.
+        let mut m = cricket(3);
+        m.config.mode = ModeConfig::Cricket(CricketConfig { hits: 1, points: true });
+        m.config.finish = FinishMode::PlayForPlaces;
+        let o = Dart::MISS;
+        throw_all(&mut m, &[Dart::single(15), Dart::single(16), Dart::single(17)]); // P0
+        throw_all(&mut m, &[Dart::single(15), Dart::single(16), Dart::single(17)]); // P1
+        let s = throw_all(&mut m, &[Dart::triple(20), Dart::triple(20), Dart::single(15)]); // P2
+        assert_eq!(points(&s, 2), 100);
+        throw_all(&mut m, &[Dart::single(18), Dart::single(19), Dart::single(20)]); // P0
+        throw_all(&mut m, &[Dart::single(18), Dart::single(19), Dart::single(20)]); // P1
+        throw_all(&mut m, &[Dart::single(16), Dart::single(17), Dart::single(18)]); // P2
+        let s = throw_all(&mut m, &[Dart::bullseye(), o, o]); // P0: complete, 25 pts
+        assert_eq!((points(&s, 0), s.players[0].place), (25, None));
+        let s = throw_all(&mut m, &[Dart::outer_bull(), o, o]); // P1: complete, 0 pts
+        assert_eq!(s.players[1].place, None);
+        // P2 closes out ahead; P0 now leads P1 with nothing left to hit.
+        let s = throw_all(&mut m, &[Dart::single(19), Dart::outer_bull()]);
+        assert!(s.finished, "no one is left stuck");
+        assert_eq!(s.players[2].place, Some(1));
+        assert_eq!(s.players[0].place, Some(2));
+        assert_eq!(s.players[1].place, Some(3));
+    }
+
+    #[test]
+    fn old_close_out_config_loads_without_points() {
+        let cfg: ModeConfig = serde_json::from_str(r#"{"kind":"close_out","hits":5}"#).unwrap();
+        assert_eq!(cfg, ModeConfig::Cricket(CricketConfig { hits: 5, points: false }));
+        assert_eq!(crate::modes::ModeKind::from_slug("close-out"), Some(crate::modes::ModeKind::Cricket));
     }
 
     #[test]

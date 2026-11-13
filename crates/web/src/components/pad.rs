@@ -10,10 +10,13 @@ pub fn Pad(
     #[prop(into)] on_dart: Callback<Dart>,
     #[prop(into)] on_undo: Callback<()>,
     #[prop(into)] can_undo: Signal<bool>,
+    /// Targets where a hit would change nothing for the player throwing.
+    /// Dimmed, not disabled: a dart can still land there.
+    #[prop(into)] dead: Signal<Vec<Segment>>,
 ) -> impl IntoView {
     let numbers: Vec<u8> = match kind {
         ModeKind::X01 => (1..=20).collect(),
-        ModeKind::CloseOut => (15..=20).collect(),
+        ModeKind::Cricket => (15..=20).collect(),
     };
     let fire = move |segment: Segment| {
         if let Some(d) = Dart::new(segment, mult.get_untracked()) {
@@ -52,7 +55,12 @@ pub fn Pad(
                     .into_iter()
                     .map(|n| {
                         view! {
-                            <button type="button" class="key" on:click=move |_| fire(Segment::Num(n))>
+                            <button
+                                type="button"
+                                class="key"
+                                class:dead=move || dead.with(|d| d.contains(&Segment::Num(n)))
+                                on:click=move |_| fire(Segment::Num(n))
+                            >
                                 {n}
                             </button>
                         }
@@ -63,6 +71,7 @@ pub fn Pad(
                 <button
                     type="button"
                     class="key key-bull"
+                    class:dead=move || dead.with(|d| d.contains(&Segment::Bull))
                     disabled=move || mult.get() == Mult::Triple
                     on:click=move |_| fire(Segment::Bull)
                 >

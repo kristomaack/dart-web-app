@@ -23,6 +23,9 @@ pub fn Results() -> impl IntoView {
     let winner = m.config.players[ranking[0]].name.clone();
     let x01 = matches!(m.config.mode, ModeConfig::X01(_));
     let multi_leg = m.config.legs_to_win() > 1;
+    // Points rank players who didn't finish, so always show them. They belong
+    // to a leg, so a multi-leg match shows the last leg's.
+    let show_points = matches!(m.config.mode, ModeConfig::Cricket(c) if c.points);
 
     let rows = ranking
         .iter()
@@ -38,6 +41,10 @@ pub fn Results() -> impl IntoView {
                 if let Some(c) = st.best_checkout {
                     parts.push(format!("Out {c}"));
                 }
+            }
+            if show_points {
+                let leg = if multi_leg { " last leg" } else { "" };
+                parts.insert(0, format!("{} pts{leg}", p.board.points()));
             }
             if multi_leg {
                 parts.insert(0, format!("{} legs", p.legs_won));
